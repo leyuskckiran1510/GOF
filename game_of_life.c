@@ -55,8 +55,8 @@ int color_comp(Color c1, Color c2) {
 }
 
 void conway_gof(int *state, int width, int height) {
-  int neighbours[][2] = {{1, 1},  {0, 1},  {1, 0},  {-1, -1}, {-1, 0},
-                         {0, -1}, {1, -1}, {-1, 1}};
+  int neighbours[8][2] = {{1, 1},  {0, 1},  {1, 0},  {-1, -1},
+                          {-1, 0}, {0, -1}, {1, -1}, {-1, 1}};
   size_t size = sizeof(int) * width * height;
   int *new_state = malloc(size);
   for (int row = 0; row < height; row++) {
@@ -71,7 +71,7 @@ void conway_gof(int *state, int width, int height) {
       }
       switch (alive) {
       case 3: {
-        new_state[row * width + col] = alive;
+        new_state[row * width + col] = 1;
         break;
       }
       case 2: {
@@ -88,30 +88,81 @@ void conway_gof(int *state, int width, int height) {
   free(new_state);
 }
 
+int primes[] = {2,   3,   5,   7,   11,  13,  17,  19,  23,  29,  31,  37,  41,
+                43,  47,  53,  59,  61,  67,  71,  73,  79,  83,  89,  97,  101,
+                103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167,
+                173, 179, 181, 191, 193, 197, 199, 211, 223, 227, 229, 233, 239,
+                241, 251, 257, 263, 269, 271, 277, 281, 283, 293, 307, 311, 313,
+                317, 331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397,
+                401, 409, 419, 421, 431, 433, 439, 443, 449, 457, 461, 463, 467,
+                479, 487, 491, 499, 503, 509, 521, 523, 541};
+
 void fill_random(int *state, int width, int height) {
-  // int x = 10, y = 10;
+  // int x = 10, y = 11;
   // (void)height;
-  // state[(y)*width + (x)] = 1;
-  // state[(y)*width + (x + 2)] = 1;
-  // state[(y + 1) * width + (x + 1)] = 1;
-  // state[(y - 1) * width + (x + 1)] = 1;
+  // // state[(y)*width + (x)] = 1;
+  // // state[(y)*width + (x + 2)] = 1;
+  // // state[(y + 1) * width + (x + 1)] = 1;
+  // // state[(y - 1) * width + (x + 1)] = 1;
 
   // state[(y)*width + (x)] = 1;
   // state[(y)*width + (x + 1)] = 1;
   // state[(y + 1) * width + (x)] = 1;
   // state[(y + 1) * width + (x + 1)] = 1;
+  int max = sizeof(primes) / sizeof(int);
   for (int row = 0; row < height; row++) {
     for (int col = 0; col < width; col++) {
-      if(row%2==col%2)
-        state[row*width+col]=3;
+      // if()
+      int x = primes[col % max] % width;
+      int y = primes[row % max] % height;
+      state[row * width + x] = 1;
     }
   }
+
+  // for(int i=0;i<max;i++){
+  //   int cord = primes[i];
+  //   int cordx = cord%width;
+  //   int cordy = cord%height;
+  //   state[cordy*width+cordx]=0;
+  // }
+}
+
+void inverse_state(int *state, int width, int height) {
+  int neighbours[][2] = {{1, 1},{-1, 0}, {0, -1},  {-1, 1},  {0, 1},  {1, 0},};//{-1, -1},{1, -1},};
+  size_t size = width*height*sizeof(int);
+  int *new_state = calloc(sizeof(int), width* height);;
+  for (int row = 0; row < height; row++) {
+    for (int col = 0; col < width; col++) {
+      if (state[row * width + col]) {
+        for (size_t k = 0; k < sizeof(neighbours) / sizeof(neighbours[0]);
+             k++) {
+          if (col + neighbours[k][0] >= 0 && col + neighbours[k][0] < width &&
+              row + neighbours[k][1] >= 0 && row + neighbours[k][1] < height) {
+            if (state[(row + neighbours[k][1]) * width + col +
+                      neighbours[k][0]])
+              new_state[(row + neighbours[k][1]) * width + col +
+                        neighbours[k][0]] = 0;
+            else {
+              new_state[(row + neighbours[k][1]) * width + col +
+                        neighbours[k][0]] = k;
+            }
+          }
+        }
+      } else {
+        new_state[row * width + col] = state[row*width+col];
+      }
+      // state[row*width+col]^=1;
+    }
+  }
+  memcpy(state, new_state, size);
+  free(new_state);
 }
 
 void plot_canvas(Canvas *c, int *state) {
   for (int row = 0; row < c->height; row++) {
     for (int col = 0; col < c->width; col++) {
-      canvas_place(c, col, row, st_col[*(state + row * c->width + col)]);
+      int value = state[row * c->width + col];
+      canvas_place(c, col, row, st_col[value]);
     }
   }
 }
@@ -133,8 +184,10 @@ int main() {
   fill_random(state, WIDTH, HEIGHT);
   plot_canvas(c, state);
   c->draw(c);
-  sleep(1);
+  // sleep(1);
   while (loop) {
+    if (!cont)
+      conway_gof(state, WIDTH, HEIGHT);
     switch (keypress()) {
     case KEY_SPACE:
       cont ^= 1;
@@ -144,14 +197,16 @@ int main() {
       loop = 0;
       continue;
     }
+    case KEY_i: {
+      inverse_state(state, WIDTH,HEIGHT);
     }
-    if (cont)
-      continue;
-    conway_gof(state, WIDTH, HEIGHT);
+    }
+    // if (cont)
+    //   continue;
     plot_canvas(c, state);
     c->draw(c);
-    c->clear(c);
     usleep(1000 * 1000 / FPS);
+    c->clear(c);
   }
   free_canvas(c);
   free(state);
